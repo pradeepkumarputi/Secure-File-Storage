@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { registerUser } from '../../services/firebase';
 
 const RegisterForm = () => {
   const [formData, setFormData] = useState({
@@ -12,6 +13,8 @@ const RegisterForm = () => {
     phone: '',
     location: ''
   });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -22,13 +25,83 @@ const RegisterForm = () => {
     });
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Handle register logic
-    console.log('Register form submitted:', formData);
+  // Add password validation function
+  const validatePassword = (password) => {
+    const minLength = 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    const errors = [];
     
-    // Navigate to dashboard after successful registration
-    navigate('/Login');
+    if (password.length < minLength) {
+      errors.push(`Password must be at least ${minLength} characters long`);
+    }
+    if (!hasUpperCase) {
+      errors.push('Password must contain at least one uppercase letter');
+    }
+    if (!hasLowerCase) {
+      errors.push('Password must contain at least one lowercase letter');
+    }
+    if (!hasNumbers) {
+      errors.push('Password must contain at least one number');
+    }
+    if (!hasSpecialChar) {
+      errors.push('Password must contain at least one special character');
+    }
+
+    return errors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    
+    // Password validation
+    const passwordErrors = validatePassword(formData.password);
+    if (passwordErrors.length > 0) {
+      setError(passwordErrors.join('\n'));
+      return;
+    }
+
+    // Check if passwords match
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Create display name from first and last name
+      const displayName = `${formData.firstName} ${formData.lastName}`;
+      
+      // Register the user
+      await registerUser(formData.email, formData.password, displayName);
+      
+      // Navigate to login page after successful registration
+      navigate('/login');
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(getErrorMessage(err.code));
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Helper function to get user-friendly error messages
+  const getErrorMessage = (errorCode) => {
+    switch (errorCode) {
+      case 'auth/email-already-in-use':
+        return 'This email is already registered';
+      case 'auth/invalid-email':
+        return 'Invalid email address';
+      case 'auth/weak-password':
+        return 'Password is too weak';
+      default:
+        return 'An error occurred during registration';
+    }
   };
 
   return (
@@ -36,6 +109,12 @@ const RegisterForm = () => {
       <div className="flex flex-col items-center mb-6">
         <h2 className="text-2xl font-medium mb-4">Sign up</h2>
       </div>
+      
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded whitespace-pre-line">
+          {error}
+        </div>
+      )}
       
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
@@ -71,6 +150,8 @@ const RegisterForm = () => {
             />
           </div>
         </div>
+        
+        {/* Other form fields remain the same */}
         
         <div className="mb-4">
           <div className="flex items-center border-b border-gray-300 py-2">
@@ -140,7 +221,24 @@ const RegisterForm = () => {
           </div>
         </div>
         
+        {/* Optional fields */}
         <div className="mb-4">
+          <div className="flex items-center border-b border-gray-300 py-2">
+            <svg className="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+            </svg>
+            <input 
+              type="tel" 
+              name="phone" 
+              value={formData.phone}
+              onChange={handleChange}
+              placeholder="Phone Number" 
+              className="w-full outline-none" 
+            />
+          </div>
+        </div>
+        
+        <div className="mb-6">
           <div className="flex items-center border-b border-gray-300 py-2">
             <svg className="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
@@ -157,27 +255,12 @@ const RegisterForm = () => {
           </div>
         </div>
         
-        <div className="mb-6">
-          <div className="flex items-center border-b border-gray-300 py-2">
-            <svg className="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
-            </svg>
-            <input 
-              type="tel" 
-              name="phone" 
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="Phone Number (Optional)" 
-              className="w-full outline-none" 
-            />
-          </div>
-        </div>
-        
         <button 
           type="submit" 
-          className="w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600 transition duration-200"
+          className="w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600 transition duration-200 disabled:opacity-70"
+          disabled={loading}
         >
-          Register
+          {loading ? 'Registering...' : 'Register'}
         </button>
       </form>
       

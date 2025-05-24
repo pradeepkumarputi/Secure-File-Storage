@@ -7,7 +7,7 @@ import UploadSection from '../components/dashboard/UploadSection';
 const Upload = () => {
   return (
     <div className="min-h-screen flex flex-col">
-      <Header isLoggedIn={true} />
+
       
       <div className="flex-grow flex">
         <Navigation />
@@ -50,8 +50,7 @@ const Upload = () => {
           </div>
         </main>
       </div>
-      
-      <Footer />
+
     </div>
   );
 };

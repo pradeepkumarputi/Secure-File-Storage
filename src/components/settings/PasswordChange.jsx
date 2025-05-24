@@ -1,4 +1,10 @@
 import React, { useState } from 'react';
+import { 
+  updatePassword, 
+  reauthenticateWithCredential, 
+  EmailAuthProvider 
+} from 'firebase/auth';
+import { auth } from '../../services/firebase';
 
 const PasswordChange = () => {
   const [formData, setFormData] = useState({
@@ -9,6 +15,7 @@ const PasswordChange = () => {
   
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -21,7 +28,7 @@ const PasswordChange = () => {
     setSuccess('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Basic validation
@@ -35,23 +42,55 @@ const PasswordChange = () => {
       return;
     }
     
-    if (formData.newPassword.length < 8) {
-      setError('Password must be at least 8 characters long');
+    if (formData.newPassword.length < 6) {
+      setError('Password must be at least 6 characters long');
       return;
     }
     
-    // Password change logic would go here
-    console.log('Password change submitted:', formData);
+    setLoading(true);
     
-    // Show success message
-    setSuccess('Password successfully changed');
-    
-    // Reset form
-    setFormData({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    });
+    try {
+      const user = auth.currentUser;
+      
+      if (!user) {
+        setError('You must be logged in to change your password');
+        return;
+      }
+      
+      // Create credential with current password for re-authentication
+      const credential = EmailAuthProvider.credential(
+        user.email, 
+        formData.currentPassword
+      );
+      
+      // Re-authenticate the user
+      await reauthenticateWithCredential(user, credential);
+      
+      // Update the password
+      await updatePassword(user, formData.newPassword);
+      
+      // Show success message
+      setSuccess('Password successfully changed');
+      
+      // Reset form
+      setFormData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (err) {
+      console.error('Password change error:', err);
+      
+      if (err.code === 'auth/wrong-password') {
+        setError('Current password is incorrect');
+      } else if (err.code === 'auth/weak-password') {
+        setError('New password is too weak');
+      } else {
+        setError('Failed to change password. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,7 +117,7 @@ const PasswordChange = () => {
             name="currentPassword"
             value={formData.currentPassword}
             onChange={handleChange}
-            className="w-full border border-gray-300 rounded p-2"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         
@@ -89,11 +128,8 @@ const PasswordChange = () => {
             name="newPassword"
             value={formData.newPassword}
             onChange={handleChange}
-            className="w-full border border-gray-300 rounded p-2"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Password must be at least 8 characters long and include a mix of letters, numbers, and special characters.
-          </p>
         </div>
         
         <div className="mb-6">
@@ -103,18 +139,17 @@ const PasswordChange = () => {
             name="confirmPassword"
             value={formData.confirmPassword}
             onChange={handleChange}
-            className="w-full border border-gray-300 rounded p-2"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         
-        <div className="flex justify-end">
-          <button 
-            type="submit" 
-            className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
-          >
-            Update Password
-          </button>
-        </div>
+        <button
+          type="submit"
+          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-200 disabled:opacity-70"
+          disabled={loading}
+        >
+          {loading ? 'Changing Password...' : 'Change Password'}
+        </button>
       </form>
     </div>
   );

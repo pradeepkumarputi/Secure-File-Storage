@@ -28,7 +28,7 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header isLoggedIn={false} />
+    
       
       <main className="flex-grow bg-gray-100 py-12">
         <div className="container mx-auto px-4">
@@ -138,7 +138,7 @@ const Contact = () => {
         </div>
       </main>
       
-      <Footer />
+    
     </div>
   );
 };

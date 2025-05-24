@@ -6,7 +6,6 @@ import Footer from "../components/common/Footer";
 const Home = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
-      <Header isLoggedIn={false} />
 
       <main className="flex-grow">
         {/* Hero Section */}
@@ -156,7 +155,7 @@ const Home = () => {
         </section>
       </main>
 
-      <Footer />
+
     </div>
   );
 };

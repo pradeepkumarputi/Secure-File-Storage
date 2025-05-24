@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { loginUser, resetPassword } from '../../services/firebase';
 
 const LoginForm = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
+  const [error, setError] = useState('');
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -16,13 +20,56 @@ const LoginForm = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle login logic
-    console.log('Login form submitted:', formData);
+    setError('');
+    setLoading(true);
+    
+    try {
+      await loginUser(formData.email, formData.password);
+      // Navigate to the Dashboard page after login
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(getErrorMessage(err.code));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Navigate to the Dashboard page after login
-    navigate('/dashboard');
+  const handleForgotPassword = async () => {
+    if (!formData.email) {
+      setError('Please enter your email address');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await resetPassword(formData.email);
+      setResetEmailSent(true);
+      setError('');
+    } catch (err) {
+      console.error('Password reset error:', err);
+      setError(getErrorMessage(err.code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to get user-friendly error messages
+  const getErrorMessage = (errorCode) => {
+    switch (errorCode) {
+      case 'auth/user-not-found':
+        return 'No account found with this email';
+      case 'auth/wrong-password':
+        return 'Invalid password';
+      case 'auth/invalid-email':
+        return 'Invalid email address';
+      case 'auth/too-many-requests':
+        return 'Too many failed login attempts. Please try again later';
+      default:
+        return 'An error occurred. Please try again';
+    }
   };
 
   return (
@@ -30,6 +77,18 @@ const LoginForm = () => {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-medium">Sign In</h2>
       </div>
+      
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+          {error}
+        </div>
+      )}
+      
+      {resetEmailSent && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
+          Password reset email sent! Check your inbox.
+        </div>
+      )}
       
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
@@ -67,14 +126,21 @@ const LoginForm = () => {
         </div>
         
         <div className="text-right mb-4">
-          <a href="#" className="text-sm text-gray-600 hover:text-blue-500">Forgot Password?</a>
+          <button 
+            type="button" 
+            onClick={handleForgotPassword} 
+            className="text-sm text-gray-600 hover:text-blue-500"
+          >
+            Forgot Password?
+          </button>
         </div>
         
         <button 
           type="submit" 
-          className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition duration-200"
+          className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition duration-200 disabled:opacity-70"
+          disabled={loading}
         >
-          Log In
+          {loading ? 'Signing in...' : 'Log In'}
         </button>
       </form>
       

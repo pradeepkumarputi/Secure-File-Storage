@@ -1,6 +1,62 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const AccountInfo = ({ user }) => {
+  const [stats, setStats] = useState({
+    uploads: 0,
+    downloads: 0,
+    lastActive: new Date().toISOString()
+  });
+
+  // Format date to display in a readable format
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not available';
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  };
+
+  useEffect(() => {
+    // Initialize stats from user data if available
+    if (user) {
+      setStats(prevStats => ({
+        ...prevStats,
+        uploads: user.uploadCount || 0,
+        downloads: user.downloadCount || 0,
+        lastActive: user.lastLogin || user.lastActive || new Date().toISOString()
+      }));
+    }
+
+    // Set up event listeners for real-time updates
+    const handleFileUpload = () => {
+      setStats(prevStats => ({
+        ...prevStats,
+        uploads: prevStats.uploads + 1,
+        lastActive: new Date().toISOString()
+      }));
+    };
+
+    const handleFileDownload = () => {
+      setStats(prevStats => ({
+        ...prevStats,
+        downloads: prevStats.downloads + 1,
+        lastActive: new Date().toISOString()
+      }));
+    };
+
+    // Register event listeners
+    window.addEventListener('fileUploaded', handleFileUpload);
+    window.addEventListener('fileDownloaded', handleFileDownload);
+
+    // Clean up event listeners
+    return () => {
+      window.removeEventListener('fileUploaded', handleFileUpload);
+      window.removeEventListener('fileDownloaded', handleFileDownload);
+    };
+  }, [user]);
+
+  if (!user) {
+    return <div>Loading user information...</div>;
+  }
+
   return (
     <div className="bg-white p-6 rounded-md shadow">
       <h2 className="text-xl font-medium mb-6">Account Info</h2>
@@ -73,7 +129,51 @@ const AccountInfo = ({ user }) => {
             </svg>
             Joined
           </div>
-          <div>{user.joinDate}</div>
+          <div>{formatDate(user.memberSince || user.joinDate)}</div>
+        </div>
+        
+        {/* Add last login time */}
+        <div className="flex">
+          <div className="w-24 text-orange-400">
+            <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+            </svg>
+            Last Login
+          </div>
+          <div>{formatDate(user.lastLogin)}</div>
+        </div>
+        
+        {/* Add last activity time */}
+        <div className="flex">
+          <div className="w-24 text-orange-400">
+            <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Last Active
+          </div>
+          <div>{formatDate(stats.lastActive)}</div>
+        </div>
+        
+        {/* Add upload statistics */}
+        <div className="flex">
+          <div className="w-24 text-orange-400">
+            <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            Uploads
+          </div>
+          <div>{stats.uploads}</div>
+        </div>
+        
+        {/* Add download statistics */}
+        <div className="flex">
+          <div className="w-24 text-orange-400">
+            <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+            </svg>
+            Downloads
+          </div>
+          <div>{stats.downloads}</div>
         </div>
       </div>
     </div>

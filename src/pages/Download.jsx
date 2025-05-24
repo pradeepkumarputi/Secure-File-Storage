@@ -1,39 +1,119 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
 import Navigation from '../components/common/Navigation';
+import { getAllFiles, downloadFile } from '../services/api';
 
 const Download = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Mock recent files data
-  const recentFiles = [
-    { 
-      id: '001', 
-      name: 'family_vacation.mp4', 
-      size: '34.5 MB', 
-      date: '2023-03-12',
-      type: 'Video'
-    },
-    { 
-      id: '002', 
-      name: 'business_presentation.mp3', 
-      size: '12.7 MB', 
-      date: '2023-02-28',
-      type: 'Audio'
-    },
-    { 
-      id: '003', 
-      name: 'wedding_speech.mp3', 
-      size: '8.2 MB', 
-      date: '2023-01-15',
-      type: 'Audio'
+  const [files, setFiles] = useState([]);
+  const [filteredFiles, setFilteredFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedType, setSelectedType] = useState('All');
+  const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [downloadKey, setDownloadKey] = useState('');
+  const [downloadError, setDownloadError] = useState(null);
+
+  useEffect(() => {
+    fetchFiles();
+  }, []);
+
+  const fetchFiles = async () => {
+    try {
+      setLoading(true);
+      const data = await getAllFiles();
+
+      // Transform the data to match our component's expected format
+      const transformedFiles = data.map(file => ({
+        id: file.id,
+        name: file.fileName,
+        size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        date: new Date(file.uploadDate).toISOString().split('T')[0],
+        type: getFileType(file.contentType)
+      }));
+
+      setFiles(transformedFiles);
+      setFilteredFiles(transformedFiles);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch files:', err);
+      setError('Failed to load files. Please try again later.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const getFileType = (contentType) => {
+    if (contentType.includes('audio')) return 'Audio';
+    if (contentType.includes('video')) return 'Video';
+    if (contentType.includes('image')) return 'Image';
+    if (contentType.includes('pdf')) return 'PDF';
+    return 'Other';
+  };
+
+  const handleSearch = () => {
+    applyFilters();
+  };
+
+  const handleTypeFilter = (type) => {
+    setSelectedType(type);
+    applyFilters(type, dateRange);
+  };
+
+  const handleDateChange = (field, value) => {
+    const newDateRange = { ...dateRange, [field]: value };
+    setDateRange(newDateRange);
+    applyFilters(selectedType, newDateRange);
+  };
+
+  const applyFilters = (type = selectedType, dates = dateRange) => {
+    let filtered = [...files];
+
+    // Apply search query filter
+    if (searchQuery) {
+      filtered = filtered.filter(file => 
+        file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        file.id.toString().includes(searchQuery)
+      );
+    }
+
+    // Apply type filter
+    if (type !== 'All') {
+      filtered = filtered.filter(file => file.type === type);
+    }
+
+    // Apply date range filter
+    if (dates.from) {
+      filtered = filtered.filter(file => file.date >= dates.from);
+    }
+    if (dates.to) {
+      filtered = filtered.filter(file => file.date <= dates.to);
+    }
+
+    setFilteredFiles(filtered);
+  };
+
+  const handleDownload = async (fileId) => {
+    try {
+      setDownloadError(null);
+      if (!downloadKey.trim()) {
+        setDownloadError('Please enter a download key');
+        return;
+      }
+      await downloadFile(fileId, downloadKey.trim());
+    } catch (err) {
+      console.error('Failed to download file:', err);
+      if (err.message === 'Invalid download key') {
+        setDownloadError('Invalid download key. Please try again with the correct key.');
+      } else {
+        setDownloadError('Failed to download file. Please try again later.');
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header isLoggedIn={true} />
       
       <div className="flex-grow flex">
         <Navigation />
@@ -54,7 +134,10 @@ const Download = () => {
                     placeholder="Enter file name or ID..."
                     className="flex-grow px-4 py-2 focus:outline-none"
                   />
-                  <button className="bg-blue-500 text-white px-4 py-2 hover:bg-blue-600 transition duration-200">
+                  <button 
+                    className="bg-blue-500 text-white px-4 py-2 hover:bg-blue-600 transition duration-200"
+                    onClick={handleSearch}
+                  >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
@@ -65,19 +148,34 @@ const Download = () => {
               <div className="mb-6">
                 <h3 className="text-md font-medium mb-2">Filter by Type</h3>
                 <div className="flex space-x-2">
-                  <button className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded-md text-sm transition duration-200">
+                  <button 
+                    className={`px-3 py-1 rounded-md text-sm transition duration-200 ${selectedType === 'All' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+                    onClick={() => handleTypeFilter('All')}
+                  >
                     All
                   </button>
-                  <button className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded-md text-sm transition duration-200">
+                  <button 
+                    className={`px-3 py-1 rounded-md text-sm transition duration-200 ${selectedType === 'Audio' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+                    onClick={() => handleTypeFilter('Audio')}
+                  >
                     Audio
                   </button>
-                  <button className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded-md text-sm transition duration-200">
+                  <button 
+                    className={`px-3 py-1 rounded-md text-sm transition duration-200 ${selectedType === 'Video' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+                    onClick={() => handleTypeFilter('Video')}
+                  >
                     Video
                   </button>
-                  <button className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded-md text-sm transition duration-200">
-                    images
+                  <button 
+                    className={`px-3 py-1 rounded-md text-sm transition duration-200 ${selectedType === 'Image' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+                    onClick={() => handleTypeFilter('Image')}
+                  >
+                    Image
                   </button>
-                  <button className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded-md text-sm transition duration-200">
+                  <button 
+                    className={`px-3 py-1 rounded-md text-sm transition duration-200 ${selectedType === 'PDF' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+                    onClick={() => handleTypeFilter('PDF')}
+                  >
                     PDF
                   </button>
                 </div>
@@ -90,6 +188,8 @@ const Download = () => {
                     <label className="block text-sm text-gray-600 mb-1">From</label>
                     <input
                       type="date"
+                      value={dateRange.from}
+                      onChange={(e) => handleDateChange('from', e.target.value)}
                       className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -97,6 +197,8 @@ const Download = () => {
                     <label className="block text-sm text-gray-600 mb-1">To</label>
                     <input
                       type="date"
+                      value={dateRange.to}
+                      onChange={(e) => handleDateChange('to', e.target.value)}
                       className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -105,11 +207,20 @@ const Download = () => {
             </div>
             
             <div className="bg-white rounded-md shadow p-6">
-              <h2 className="text-lg font-medium mb-4">Recent Files</h2>
+              <h2 className="text-lg font-medium mb-4">Files</h2>
               
-              {recentFiles.length > 0 ? (
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                  <p className="mt-2 text-gray-600">Loading files...</p>
+                </div>
+              ) : error ? (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                  <span className="block sm:inline">{error}</span>
+                </div>
+              ) : filteredFiles.length > 0 ? (
                 <div className="space-y-4">
-                  {recentFiles.map((file) => (
+                  {filteredFiles.map((file) => (
                     <div key={file.id} className="border border-gray-200 rounded-md p-4 hover:bg-gray-50">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="font-medium">{file.name}</h3>
@@ -124,12 +235,29 @@ const Download = () => {
                         <span>Uploaded: {file.date}</span>
                       </div>
                       <div className="mt-3">
-                        <button className="bg-blue-500 text-white px-4 py-1 rounded text-sm hover:bg-blue-600 transition duration-200 flex items-center">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                          </svg>
-                          Download
-                        </button>
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex">
+                            <input 
+                              type="text" 
+                              placeholder="Enter download key" 
+                              className="border border-gray-300 rounded-l px-2 py-1 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              value={downloadKey}
+                              onChange={(e) => setDownloadKey(e.target.value)}
+                            />
+                            <button 
+                              className="bg-blue-500 text-white px-3 py-1 rounded-r text-sm hover:bg-blue-600 transition duration-200 flex items-center"
+                              onClick={() => handleDownload(file.id)}
+                            >
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                              </svg>
+                              Download
+                            </button>
+                          </div>
+                          {downloadError && (
+                            <div className="text-xs text-red-600">{downloadError}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -147,7 +275,7 @@ const Download = () => {
         </main>
       </div>
       
-      <Footer />
+   
     </div>
   );
 };

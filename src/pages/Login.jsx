@@ -13,7 +13,6 @@ const Login = () => {
           <LoginForm />
         </div>
       </main>
-      
       <Footer />
     </div>
   );

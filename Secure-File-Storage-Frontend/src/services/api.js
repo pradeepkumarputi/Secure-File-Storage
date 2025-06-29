@@ -1,5 +1,5 @@
 // API service for connecting to the backend
-const API_BASE_URL = 'http://localhost:8080/api/files';
+const API_BASE_URL = 'https://secure-file-storage-29sa.onrender.com/api/files';
 
 // Get all files
 export const getAllFiles = async () => {

@@ -10,6 +10,8 @@ import {
   onAuthStateChanged
 } from "firebase/auth";
 
+console.log("Env check:", process.env.REACT_APP_FIREBASE_PROJECT_ID);
+  
 console.log("FIREBASE CONFIG:", firebaseConfig);
 
 const firebaseConfig = {
